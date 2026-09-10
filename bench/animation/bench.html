@@ -1,0 +1,206 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>3Dmol animation-path benchmark</title>
+<!--
+  WHAT THIS MEASURES.
+
+  3Dmol's trajectory path (setFrame) swaps the model's atom list and nulls molObj, so every frame
+  rebuilds every geometry: style resolution per atom, colours, radii, face indices, fresh typed
+  arrays, full buffer upload. When only coordinates changed, all of that work reproduces the
+  previous frame's values. The animation fast path (GLModel.syncAtomPositions) rewrites position
+  data in the existing arrays and respecifies only those buffers.
+
+  This page runs the SAME frames through both paths on the same model and reports, per pass:
+    time      wall-clock around update + render + one animation-frame yield
+    bytes     typed-array bytes allocated (opt-in counting pass; never during a timing pass)
+  and, once per workload, an OUTPUT HASH of every position buffer so the two paths can be proven
+  to have drawn the same geometry. A benchmark that got faster by drawing something else would
+  be worthless; the hash is what makes the numbers comparable.
+
+  The page exposes the steps separately (window.bench.setup / hashCheck / pass / alloc /
+  teardown) so the driver, run.mjs, can wrap EACH pass in its own GC trace and CPU counters over
+  the DevTools protocol -- that is what makes GC time attributable to one path or the other.
+-->
+<style>
+  html, body { margin: 0; background: #0b0d12; color: #cfd6e4; font: 13px ui-monospace, Consolas, monospace; }
+  #view { width: 800px; height: 600px; position: relative; }
+  #out { white-space: pre; padding: 10px; }
+</style>
+<div id="view"></div>
+<pre id="out">idle</pre>
+
+<script>
+// ── allocation counter (installed only when an alloc pass asks for it) ─────────────────────
+// 3Dmol looks up Float32Array etc. on the global at call time, so subclassing the globals
+// counts every typed array it creates. Subarrays and views are not allocations and go through
+// the original constructors untouched. Installed once, toggled by `counting`.
+window.__alloc = { bytes: 0, n: 0, counting: false, installed: false };
+function installAllocCounter() {
+  if (window.__alloc.installed) return;
+  for (const name of ['Float32Array', 'Float64Array', 'Uint16Array', 'Uint32Array', 'Int32Array', 'Uint8Array', 'ArrayBuffer']) {
+    const Orig = window[name];
+    const W = function (...args) {
+      const inst = Reflect.construct(Orig, args, new.target || W);
+      if (window.__alloc.counting) { window.__alloc.bytes += inst.byteLength; window.__alloc.n++; }
+      return inst;
+    };
+    W.prototype = Orig.prototype;
+    Object.setPrototypeOf(W, Orig);
+    Object.defineProperty(W, 'name', { value: name });
+    window[name] = W;
+  }
+  window.__alloc.installed = true;
+}
+</script>
+<script>
+// ?bundle=<path relative to the repo root> loads an alternate build (e.g. a variant with a
+// deliberately different allocation strategy) so the same page measures it the same way.
+(function () {
+  const b = new URLSearchParams(location.search).get('bundle') || 'build/3Dmol.js';
+  document.write('<script src="../../' + b.replace(/"/g, '') + '"><\/script>');
+})();
+</script>
+<script>
+/* global $3Dmol */
+const OUT = document.getElementById('out');
+const say = m => { OUT.textContent = m; };
+
+const STYLES = {
+  ballstick: { stick: { radius: 0.15 }, sphere: { scale: 0.22 } },   // both imposter kinds
+  sphere:    { sphere: { scale: 0.3 } },
+  stick:     { stick: { radius: 0.2 } },
+};
+
+// Median and p95: one GC pause or scheduler hiccup drags a mean and hides the typical frame.
+function stats(xs) {
+  const s = [...xs].sort((a, b) => a - b);
+  const at = q => s[Math.min(s.length - 1, Math.floor(s.length * q))];
+  return { n: s.length, median: +at(0.5).toFixed(3), p95: +at(0.95).toFixed(3), min: +s[0].toFixed(3), max: +s[s.length - 1].toFixed(3) };
+}
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+
+// FNV-1a over the float bit patterns of every position buffer in the model: an exact
+// fingerprint of what will be drawn, independent of how it was produced.
+function geometryHash(model) {
+  let h = 0x811c9dc5 >>> 0, count = 0;
+  const mix = (arr, len) => {
+    const u = new Uint32Array(arr.buffer, arr.byteOffset, len);
+    for (let i = 0; i < len; i++) { h ^= u[i]; h = Math.imul(h, 0x01000193) >>> 0; }
+    count += len;
+  };
+  const walk = obj => {
+    if (obj.geometry && obj.geometry.geometryGroups) {
+      for (const g of obj.geometry.geometryGroups) {
+        if (g.vertexArray) mix(g.vertexArray, g.vertices * 3);
+        if (g.normalArray) mix(g.normalArray, g.vertices * 3);
+        if (g.colorArray) mix(g.colorArray, g.vertices * 3);   // stale-data guard for pooled variants
+      }
+    }
+    if (obj.children) obj.children.forEach(walk);
+  };
+  if (model.molObj) walk(model.molObj);
+  return { hash: h.toString(16).padStart(8, '0'), floats: count };
+}
+
+// A smooth whole-molecule distortion for synthetic frames: every atom moves every frame by a
+// few angstrom. The physics is irrelevant to the cost; what matters is that no frame is a no-op.
+function displaced(atoms, t) {
+  return atoms.map((a, i) => {
+    const ph = (i / atoms.length) * Math.PI * 4;
+    return Object.assign({}, a, { x: a.x + Math.sin(ph + t) * 3.0, y: a.y + Math.cos(ph * 0.7 + t) * 2.0, z: a.z + Math.sin(ph * 1.3 + t) * 1.5 });
+  });
+}
+
+// ── the stateful bench: one workload at a time ─────────────────────────────────────────────
+const B = window.bench = { viewer: null, model: null, live: null, frames: null, nFrames: 0, frame0: null, refused: 0 };
+
+/** src = { name, text, format, frames? }. frames given -> synthesise that many from a single
+ *  model (size ladder); absent -> the file's own models are the frames (a real trajectory). */
+B.setup = async function (src, style) {
+  const el = document.getElementById('view'); el.innerHTML = '';
+  const viewer = B.viewer = $3Dmol.createViewer(el, { backgroundColor: '#0b0d12' });
+  let model;
+  if (src.frames) {
+    model = viewer.addModel(src.text, src.format);
+    const base = model.selectedAtoms({});
+    for (let f = 0; f < src.frames; f++) model.addFrame(displaced(base, f * 0.25));
+  } else {
+    viewer.addModelsAsFrames(src.text, src.format);
+    model = viewer.getModel();
+  }
+  B.model = model; B.nFrames = model.getNumFrames(); B.refused = 0;
+  if (B.nFrames < 2) throw new Error(src.name + ': fewer than 2 frames');
+  model.setStyle({}, STYLES[style]);
+  await model.setFrame(0); viewer.zoomTo(); viewer.render(); await nextFrame();
+  B.live = model.selectedAtoms({});
+  B.frames = typeof model.getFrames === 'function' ? model.getFrames() : model.frames;
+  // Pristine frame-0 coordinates: the fast path writes INTO these atom objects, so rearm()
+  // restores them before every rebuild that must start from the true frame 0.
+  B.frame0 = new Float32Array(B.live.length * 3);
+  B.live.forEach((a, i) => { B.frame0[i*3] = a.x; B.frame0[i*3+1] = a.y; B.frame0[i*3+2] = a.z; });
+  say('ready: ' + src.name);
+  return { atoms: B.live.length, frames: B.nFrames, bonds: B.live.reduce((n, a) => n + (a.bonds ? a.bonds.length : 0), 0) / 2 };
+};
+
+// Baseline: the repo's own API. setFrame swaps atoms, nulls molObj, render rebuilds.
+async function baselineFrame(f) { await B.model.setFrame(f); B.viewer.render(); }
+// Fast path: the public API with the replay option. setFrame installs frame f's atom list and
+// replays its coordinates into the existing geometry (syncAtomPositions, resolving atoms by
+// index). If the replay refuses, setFrame falls back to discarding the geometry for a rebuild;
+// that shows as molObj going null, and is counted as a refusal so it cannot pass silently.
+async function fastFrame(f) {
+  await B.model.setFrame(f, { fast: true });
+  if (B.model.molObj === null) B.refused++;
+  B.viewer.render();
+}
+// Rebuild once at the true frame 0 so the fast path's recorded map refers to the live objects.
+async function rearm() {
+  const f0 = B.frames[0];                        // the frame-0 atom objects, whatever frame is current
+  for (let i = 0; i < f0.length; i++) { f0[i].x = B.frame0[i*3]; f0[i].y = B.frame0[i*3+1]; f0[i].z = B.frame0[i*3+2]; }
+  await B.model.setFrame(0); B.viewer.render(); await nextFrame();
+  B.live = B.model.selectedAtoms({});
+}
+const STEP = { baseline: baselineFrame, fast: fastFrame };
+
+/** Output equality: both paths at the same frame must hash identically. */
+B.hashCheck = async function () {
+  await baselineFrame(1); await nextFrame(); const hB = geometryHash(B.model);
+  await rearm(); await fastFrame(1); await nextFrame(); const hF = geometryHash(B.model);
+  return { baseline: hB, fast: hF, equal: hB.hash === hF.hash && hB.floats === hF.floats };
+};
+
+/** One timed pass over `frames` measured frames after `warmup` discarded ones. */
+B.pass = async function (which, frames, warmup) {
+  if (which === 'fast') await rearm();
+  const step = STEP[which], times = [], r0 = B.refused;
+  say('pass ' + which);
+  for (let k = 0; k < warmup + frames; k++) {
+    const f = 1 + (k % (B.nFrames - 1));
+    const t0 = performance.now();
+    await step(f); await nextFrame();
+    if (k >= warmup) times.push(performance.now() - t0);
+  }
+  return { label: which, frames, warmup, refused: B.refused - r0, ...stats(times) };
+};
+
+/** One counting pass: bytes of typed arrays allocated per frame. Never inside a timed pass. */
+B.alloc = async function (which, frames) {
+  installAllocCounter();
+  if (which === 'fast') await rearm();
+  const step = STEP[which];
+  window.__alloc.bytes = 0; window.__alloc.n = 0; window.__alloc.counting = true;
+  for (let k = 0; k < frames; k++) { await step(1 + (k % (B.nFrames - 1))); await nextFrame(); }
+  window.__alloc.counting = false;
+  return { label: which, frames, bytesPerFrame: Math.round(window.__alloc.bytes / frames), arraysPerFrame: +(window.__alloc.n / frames).toFixed(1) };
+};
+
+B.teardown = async function () { if (B.viewer) B.viewer.clear(); B.viewer = B.model = B.live = B.frames = null; say('idle'); };
+
+B.gpu = function () {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    return dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'unknown';
+  } catch (_) { return 'unknown'; }
+};
+</script>

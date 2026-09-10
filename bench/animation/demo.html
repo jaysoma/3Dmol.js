@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>3Dmol trajectory playback: rebuild vs replay</title>
+<!--
+  Two linked viewers playing the SAME frames in lockstep. Left advances with setFrame(f), which
+  discards and rebuilds every geometry per frame. Right advances with setFrame(f, {fast: true}),
+  which replays the frame's coordinates into the existing geometry. The readout under each is
+  the wall-clock cost of that side's frame (update + render), smoothed.
+
+  Serve the repo root and open this page:   node bench/animation/run.mjs --serve
+  Default source is the repo's 29-frame fixture. Drop any single-model PDB on the page (or use
+  the file picker) to play synthesised frames over it -- every atom moves every frame.
+-->
+<style>
+  html, body { margin: 0; background: #0b0d12; color: #cfd6e4; font: 13px ui-monospace, Consolas, monospace; }
+  #bar { display: flex; gap: 18px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #1d2735; flex-wrap: wrap; }
+  #bar label { display: flex; gap: 6px; align-items: center; color: #8aa0b8; }
+  select, button, input[type=file] { font: inherit; background: #121a26; color: #cfe0f2; border: 1px solid #2f4f7f; border-radius: 5px; padding: 4px 8px; }
+  #panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 14px; }
+  .panel h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #cfe0f2; }
+  .panel h2 code { color: #f0b54a; }
+  .view { width: 100%; aspect-ratio: 4 / 3; position: relative; border: 1px solid #1d2735; }
+  .ro { margin-top: 6px; display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .ro b { color: #f0b54a; font-size: 16px; }
+  #src { color: #8aa0b8; padding: 0 14px 12px; }
+</style>
+<div id="bar">
+  <label>style <select id="style"><option value="ballstick">ball &amp; stick</option><option value="sphere">spheres</option><option value="stick">sticks</option></select></label>
+  <label>source <select id="source"><option value="fixture">temp_1_2_28.pdb (29 real frames)</option><option value="file">local PDB (synthesised frames)</option></select></label>
+  <input id="file" type="file" accept=".pdb" style="display:none">
+  <button id="play">Pause</button>
+</div>
+<div id="panels">
+  <div class="panel"><h2><code>setFrame(f)</code> — rebuild every frame</h2><div id="L" class="view"></div><div class="ro"><span>frame <span id="fL">0</span></span><span><b id="msL">—</b> ms/frame</span></div></div>
+  <div class="panel"><h2><code>setFrame(f, {fast: true})</code> — replay positions in place</h2><div id="R" class="view"></div><div class="ro"><span>frame <span id="fR">0</span></span><span><b id="msR">—</b> ms/frame</span></div></div>
+</div>
+<div id="src">loading…</div>
+
+<script src="../../build/3Dmol.js"></script>
+<script>
+/* global $3Dmol */
+const STYLES = { ballstick: { stick: { radius: 0.15 }, sphere: { scale: 0.22 } }, sphere: { sphere: { scale: 0.3 } }, stick: { stick: { radius: 0.2 } } };
+const $ = id => document.getElementById(id);
+let vL, vR, mL, mR, n = 0, f = 0, playing = true, tok = 0, emaL = null, emaR = null;
+
+function displaced(atoms, t) {
+  return atoms.map((a, i) => { const ph = (i / atoms.length) * Math.PI * 4;
+    return Object.assign({}, a, { x: a.x + Math.sin(ph + t) * 3.0, y: a.y + Math.cos(ph * 0.7 + t) * 2.0, z: a.z + Math.sin(ph * 1.3 + t) * 1.5 }); });
+}
+function makeModel(viewer, text, synth) {
+  let m;
+  if (synth) { m = viewer.addModel(text, 'pdb'); const base = m.selectedAtoms({}); for (let k = 0; k < 40; k++) m.addFrame(displaced(base, k * 0.25)); }
+  else { viewer.addModelsAsFrames(text, 'pdb'); m = viewer.getModel(); }
+  m.setStyle({}, STYLES[$('style').value]);
+  return m;
+}
+async function load(text, label, synth) {
+  tok++;
+  $('L').innerHTML = ''; $('R').innerHTML = '';
+  vL = $3Dmol.createViewer($('L'), { backgroundColor: '#0b0d12' });
+  vR = $3Dmol.createViewer($('R'), { backgroundColor: '#0b0d12' });
+  mL = makeModel(vL, text, synth); mR = makeModel(vR, text, synth);
+  n = mL.getNumFrames(); f = 0; emaL = emaR = null;
+  await mL.setFrame(0); await mR.setFrame(0);
+  vL.zoomTo(); vR.zoomTo(); vL.render(); vR.render();
+  vL.linkViewer(vR); vR.linkViewer(vL);            // drag one, both move
+  $('src').textContent = label + ' · ' + mL.selectedAtoms({}).length.toLocaleString() + ' atoms · ' + n + ' frames';
+  loop(tok);
+}
+async function loop(myTok) {
+  while (myTok === tok) {
+    if (playing) {
+      f = (f + 1) % n;
+      let t0 = performance.now(); await mL.setFrame(f); vL.render(); const dL = performance.now() - t0;
+      t0 = performance.now(); await mR.setFrame(f, { fast: true }); vR.render(); const dR = performance.now() - t0;
+      emaL = emaL === null ? dL : emaL * 0.9 + dL * 0.1;
+      emaR = emaR === null ? dR : emaR * 0.9 + dR * 0.1;
+      $('fL').textContent = f; $('fR').textContent = f;
+      $('msL').textContent = emaL.toFixed(1); $('msR').textContent = emaR.toFixed(1);
+    }
+    await new Promise(r => requestAnimationFrame(r));
+  }
+}
+
+async function loadFixture() {
+  const text = await (await fetch('../../tests/auto/data/temp_1_2_28.pdb')).text();
+  load(text, 'tests/auto/data/temp_1_2_28.pdb', false);
+}
+$('source').onchange = () => { if ($('source').value === 'fixture') loadFixture(); else $('file').click(); };
+$('file').onchange = async () => { const fl = $('file').files[0]; if (fl) load(await fl.text(), fl.name, true); };
+$('style').onchange = () => { if (mL) { mL.setStyle({}, STYLES[$('style').value]); mR.setStyle({}, STYLES[$('style').value]); } };
+$('play').onclick = () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; };
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', async e => { e.preventDefault(); const fl = e.dataTransfer.files[0]; if (fl) { $('source').value = 'file'; load(await fl.text(), fl.name, true); } });
+loadFixture();
+</script>

@@ -1,0 +1,6 @@
+# built variant bundles are reproduced from the bench-noalloc branch (see README); not versioned
+variants/
+# scratch runs; the referenced result sets are results-full.json, results-noalloc.json, results-final.json
+results-smoke.json
+results-diag-*.json
+results-indexfix.json

@@ -1,0 +1,881 @@
+{
+  "when": "2026-09-10T17:13:25.179Z",
+  "options": {
+    "pdb": [
+      "C:/Projects/GithubRoot/FoldView/structures/P07942.pdb",
+      "C:/Projects/GithubRoot/FoldView/structures/A6H8Y1.pdb"
+    ],
+    "fetch": [],
+    "framesFile": [],
+    "style": "ballstick",
+    "frames": 100,
+    "warmup": 10,
+    "repeats": 3,
+    "allocFrames": 20,
+    "strict": false,
+    "trace": true,
+    "out": "bench/animation/results-noalloc.json",
+    "bundle": "bench/animation/variants/3Dmol-noalloc.js"
+  },
+  "machine": {
+    "platform": "win32",
+    "cpu": "AMD Ryzen 5 7640HS w/ Radeon 760M Graphics     ",
+    "cores": 12,
+    "memGB": 25.8,
+    "renderer": "ANGLE (AMD, AMD Radeon 760M Graphics (0x000015BF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "node": "v24.16.0",
+    "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+  },
+  "results": [
+    {
+      "name": "1lo6 (synthetic frames)",
+      "runs": [
+        {
+          "repeat": 0,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.8,
+          "p95": 6.4,
+          "min": 3.2,
+          "max": 8.1,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 513
+          },
+          "gc": {
+            "pauses": 41,
+            "ms": 9.1
+          }
+        },
+        {
+          "repeat": 0,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 1.6,
+          "p95": 4.5,
+          "min": 1,
+          "max": 53.3,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 261
+          },
+          "gc": {
+            "pauses": 22,
+            "ms": 2.4
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 1.8,
+          "p95": 4.5,
+          "min": 0.9,
+          "max": 5.7,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 240
+          },
+          "gc": {
+            "pauses": 14,
+            "ms": 1.5
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.1,
+          "p95": 5.8,
+          "min": 2.8,
+          "max": 6.7,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 443
+          },
+          "gc": {
+            "pauses": 43,
+            "ms": 8.3
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.3,
+          "p95": 5.7,
+          "min": 2.9,
+          "max": 6.1,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 440
+          },
+          "gc": {
+            "pauses": 41,
+            "ms": 8.5
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 1.7,
+          "p95": 4.7,
+          "min": 0.9,
+          "max": 5.2,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 246
+          },
+          "gc": {
+            "pauses": 14,
+            "ms": 1.7
+          }
+        }
+      ],
+      "atoms": 1833,
+      "frames": 31,
+      "bonds": 1741,
+      "hash": {
+        "baseline": {
+          "hash": "48e1643b",
+          "floats": 161244
+        },
+        "fast": {
+          "hash": "48e1643b",
+          "floats": 161244
+        },
+        "equal": true
+      },
+      "alloc": {
+        "baseline": {
+          "label": "baseline",
+          "frames": 20,
+          "bytesPerFrame": 1068,
+          "arraysPerFrame": 20
+        },
+        "fast": {
+          "label": "fast",
+          "frames": 20,
+          "bytesPerFrame": 0,
+          "arraysPerFrame": 0
+        }
+      },
+      "summary": {
+        "baseline": {
+          "median": 4.3,
+          "p95": 5.8,
+          "refused": 0,
+          "gcMsPerFrame": 0.08,
+          "mainThreadMsPerFrame": 4.23
+        },
+        "fast": {
+          "median": 1.7,
+          "p95": 4.5,
+          "refused": 0,
+          "gcMsPerFrame": 0.02,
+          "mainThreadMsPerFrame": 2.26
+        },
+        "speedup": 2.53
+      }
+    },
+    {
+      "name": "4csv (synthetic frames)",
+      "runs": [
+        {
+          "repeat": 0,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.8,
+          "p95": 5.6,
+          "min": 3.7,
+          "max": 6.3,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 507
+          },
+          "gc": {
+            "pauses": 55,
+            "ms": 7.7
+          }
+        },
+        {
+          "repeat": 0,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 2.3,
+          "p95": 4.9,
+          "min": 1,
+          "max": 5.3,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 272
+          },
+          "gc": {
+            "pauses": 20,
+            "ms": 2.3
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 2.2,
+          "p95": 4.7,
+          "min": 1,
+          "max": 4.9,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 272
+          },
+          "gc": {
+            "pauses": 21,
+            "ms": 2
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 5,
+          "p95": 5.9,
+          "min": 4,
+          "max": 6,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 523
+          },
+          "gc": {
+            "pauses": 53,
+            "ms": 6.9
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.8,
+          "p95": 5.7,
+          "min": 3.7,
+          "max": 6.1,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 497
+          },
+          "gc": {
+            "pauses": 41,
+            "ms": 6.2
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 2.4,
+          "p95": 4.6,
+          "min": 1,
+          "max": 5,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 273
+          },
+          "gc": {
+            "pauses": 23,
+            "ms": 1.7
+          }
+        }
+      ],
+      "atoms": 2061,
+      "frames": 31,
+      "bonds": 2057,
+      "hash": {
+        "baseline": {
+          "hash": "c5dd8311",
+          "floats": 184500
+        },
+        "fast": {
+          "hash": "c5dd8311",
+          "floats": 184500
+        },
+        "equal": true
+      },
+      "alloc": {
+        "baseline": {
+          "label": "baseline",
+          "frames": 20,
+          "bytesPerFrame": 1068,
+          "arraysPerFrame": 20
+        },
+        "fast": {
+          "label": "fast",
+          "frames": 20,
+          "bytesPerFrame": 0,
+          "arraysPerFrame": 0
+        }
+      },
+      "summary": {
+        "baseline": {
+          "median": 4.8,
+          "p95": 5.7,
+          "refused": 0,
+          "gcMsPerFrame": 0.06,
+          "mainThreadMsPerFrame": 4.63
+        },
+        "fast": {
+          "median": 2.3,
+          "p95": 4.7,
+          "refused": 0,
+          "gcMsPerFrame": 0.02,
+          "mainThreadMsPerFrame": 2.48
+        },
+        "speedup": 2.09
+      }
+    },
+    {
+      "name": "temp_1_2_28 (29 real frames)",
+      "runs": [
+        {
+          "repeat": 0,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.7,
+          "p95": 5.8,
+          "min": 3.4,
+          "max": 6.8,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 479
+          },
+          "gc": {
+            "pauses": 99,
+            "ms": 46.9
+          }
+        },
+        {
+          "repeat": 0,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 2.4,
+          "p95": 4.7,
+          "min": 1.1,
+          "max": 5,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 278
+          },
+          "gc": {
+            "pauses": 24,
+            "ms": 2.5
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 2.2,
+          "p95": 4.8,
+          "min": 1.2,
+          "max": 5,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 287
+          },
+          "gc": {
+            "pauses": 30,
+            "ms": 3.3
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.6,
+          "p95": 6.5,
+          "min": 3.5,
+          "max": 7.6,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 498
+          },
+          "gc": {
+            "pauses": 83,
+            "ms": 18.9
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 4.6,
+          "p95": 5.9,
+          "min": 3.3,
+          "max": 7,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 477
+          },
+          "gc": {
+            "pauses": 90,
+            "ms": 21.4
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 2.4,
+          "p95": 4.5,
+          "min": 1.2,
+          "max": 4.9,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 278
+          },
+          "gc": {
+            "pauses": 27,
+            "ms": 3.3
+          }
+        }
+      ],
+      "atoms": 2110,
+      "frames": 29,
+      "bonds": 2185,
+      "hash": {
+        "baseline": {
+          "hash": "74197feb",
+          "floats": 198756
+        },
+        "fast": {
+          "hash": "72e16fb3",
+          "floats": 198648
+        },
+        "equal": false
+      },
+      "alloc": {
+        "baseline": {
+          "label": "baseline",
+          "frames": 20,
+          "bytesPerFrame": 1068,
+          "arraysPerFrame": 20
+        },
+        "fast": {
+          "label": "fast",
+          "frames": 20,
+          "bytesPerFrame": 0,
+          "arraysPerFrame": 0
+        }
+      },
+      "summary": {
+        "baseline": {
+          "median": 4.6,
+          "p95": 5.9,
+          "refused": 0,
+          "gcMsPerFrame": 0.26,
+          "mainThreadMsPerFrame": 4.41
+        },
+        "fast": {
+          "median": 2.4,
+          "p95": 4.7,
+          "refused": 0,
+          "gcMsPerFrame": 0.03,
+          "mainThreadMsPerFrame": 2.55
+        },
+        "speedup": 1.92
+      }
+    },
+    {
+      "name": "P07942.pdb (synthetic frames)",
+      "runs": [
+        {
+          "repeat": 0,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 22.8,
+          "p95": 26.6,
+          "min": 21,
+          "max": 28.8,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 2563
+          },
+          "gc": {
+            "pauses": 279,
+            "ms": 123.4
+          }
+        },
+        {
+          "repeat": 0,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 9.6,
+          "p95": 11.4,
+          "min": 8.7,
+          "max": 12.3,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 1096
+          },
+          "gc": {
+            "pauses": 99,
+            "ms": 20.3
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 9.3,
+          "p95": 10.2,
+          "min": 8.5,
+          "max": 10.7,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 1028
+          },
+          "gc": {
+            "pauses": 116,
+            "ms": 18.9
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 23.3,
+          "p95": 27.6,
+          "min": 21,
+          "max": 28.9,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 2596
+          },
+          "gc": {
+            "pauses": 270,
+            "ms": 119.8
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 23.4,
+          "p95": 27.1,
+          "min": 21,
+          "max": 35.7,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 2617
+          },
+          "gc": {
+            "pauses": 275,
+            "ms": 130.3
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 8.6,
+          "p95": 10.6,
+          "min": 8,
+          "max": 12.5,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 1004
+          },
+          "gc": {
+            "pauses": 103,
+            "ms": 22
+          }
+        }
+      ],
+      "atoms": 13793,
+      "frames": 31,
+      "bonds": 14055,
+      "hash": {
+        "baseline": {
+          "hash": "b33761cd",
+          "floats": 1269144
+        },
+        "fast": {
+          "hash": "b33761cd",
+          "floats": 1269144
+        },
+        "equal": true
+      },
+      "alloc": {
+        "baseline": {
+          "label": "baseline",
+          "frames": 20,
+          "bytesPerFrame": 1068,
+          "arraysPerFrame": 21
+        },
+        "fast": {
+          "label": "fast",
+          "frames": 20,
+          "bytesPerFrame": 0,
+          "arraysPerFrame": 0
+        }
+      },
+      "summary": {
+        "baseline": {
+          "median": 23.3,
+          "p95": 27.1,
+          "refused": 0,
+          "gcMsPerFrame": 1.13,
+          "mainThreadMsPerFrame": 23.56
+        },
+        "fast": {
+          "median": 9.3,
+          "p95": 10.6,
+          "refused": 0,
+          "gcMsPerFrame": 0.19,
+          "mainThreadMsPerFrame": 9.48
+        },
+        "speedup": 2.51
+      }
+    },
+    {
+      "name": "A6H8Y1.pdb (synthetic frames)",
+      "runs": [
+        {
+          "repeat": 0,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 34.7,
+          "p95": 38.6,
+          "min": 30,
+          "max": 39.5,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 3792
+          },
+          "gc": {
+            "pauses": 447,
+            "ms": 275.5
+          }
+        },
+        {
+          "repeat": 0,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 11.4,
+          "p95": 13,
+          "min": 10.9,
+          "max": 13.9,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 1326
+          },
+          "gc": {
+            "pauses": 158,
+            "ms": 30.9
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 11.5,
+          "p95": 13,
+          "min": 10.9,
+          "max": 13.9,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 1326
+          },
+          "gc": {
+            "pauses": 158,
+            "ms": 30.8
+          }
+        },
+        {
+          "repeat": 1,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 35.5,
+          "p95": 41,
+          "min": 30.5,
+          "max": 66.6,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 3939
+          },
+          "gc": {
+            "pauses": 448,
+            "ms": 389.7
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "baseline",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 35.9,
+          "p95": 41.4,
+          "min": 30.6,
+          "max": 44.5,
+          "cpu": {
+            "scriptMs": 0,
+            "taskMs": 3959
+          },
+          "gc": {
+            "pauses": 424,
+            "ms": 303.7
+          }
+        },
+        {
+          "repeat": 2,
+          "label": "fast",
+          "frames": 100,
+          "warmup": 10,
+          "refused": 0,
+          "n": 100,
+          "median": 12.8,
+          "p95": 15,
+          "min": 11.7,
+          "max": 15.9,
+          "cpu": {
+            "scriptMs": 1,
+            "taskMs": 1431
+          },
+          "gc": {
+            "pauses": 167,
+            "ms": 35.9
+          }
+        }
+      ],
+      "atoms": 20572,
+      "frames": 31,
+      "bonds": 20840,
+      "hash": {
+        "baseline": {
+          "hash": "3d0e3fb3",
+          "floats": 1891188
+        },
+        "fast": {
+          "hash": "3d0e3fb3",
+          "floats": 1891188
+        },
+        "equal": true
+      },
+      "alloc": {
+        "baseline": {
+          "label": "baseline",
+          "frames": 20,
+          "bytesPerFrame": 1068,
+          "arraysPerFrame": 22
+        },
+        "fast": {
+          "label": "fast",
+          "frames": 20,
+          "bytesPerFrame": 0,
+          "arraysPerFrame": 0
+        }
+      },
+      "summary": {
+        "baseline": {
+          "median": 35.5,
+          "p95": 41,
+          "refused": 0,
+          "gcMsPerFrame": 2.94,
+          "mainThreadMsPerFrame": 35.42
+        },
+        "fast": {
+          "median": 11.5,
+          "p95": 13,
+          "refused": 0,
+          "gcMsPerFrame": 0.3,
+          "mainThreadMsPerFrame": 12.37
+        },
+        "speedup": 3.09
+      }
+    }
+  ]
+}
