@@ -3353,8 +3353,16 @@ export class GLModel {
      * @param {Object3D} group
      * @param Object options
      */
+    // BENCH VARIANT (branch bench-noalloc): hand a discarded build's group arrays back to the
+    // pool so the next build takes them instead of allocating. Only on a true teardown.
+    private static recycleGeometries(obj: any) {
+        if (obj.geometry) Geometry.recycle(obj.geometry);
+        if (obj.children) for (const c of obj.children) GLModel.recycleGeometries(c);
+    }
+
     public globj(group, options) {
         if (this.molObj === null || options.regen) { // have to regenerate
+            if (this.molObj === null && this.renderedMolObj) GLModel.recycleGeometries(this.renderedMolObj);
             this.molObj = this.createMolObj(this.atoms, options);
             if (this.renderedMolObj) { // previously rendered, remove
                 group.remove(this.renderedMolObj);

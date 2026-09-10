@@ -5,6 +5,11 @@ import { Vector3 } from "../math";
 import { CC, Color } from "../../colors";
 import { AtomSpec } from 'specs';
 const BUFFERSIZE = 65535; //limited to 16bit indices
+
+// BENCH VARIANT: pool of full-capacity group arrays, keyed by which arrays a geometry carries.
+const GROUP_POOL: Record<string, any[]> = {};
+export const POOL_STATS = { allocated: 0, reused: 0, recycled: 0 };
+if (typeof window !== 'undefined') (window as any).__geomPool = POOL_STATS;
 export class GeometryGroup {
   id: number;
   vertexArray: Float32Array | null = null;
@@ -433,31 +438,65 @@ export class Geometry extends EventDispatcher {
     return ret;
   }
 
+  // BENCH VARIANT (branch bench-noalloc, never for merge). Group arrays are taken from a pool
+  // that Geometry.recycle() refills from discarded builds, instead of being allocated fresh at
+  // full capacity every rebuild. Same arrays, same sizes, same code paths otherwise -- the only
+  // thing removed is allocation (and with it zero-fill and GC pressure), which is what the
+  // benchmark subtracts out. Reused arrays hold stale data; the benchmark's output hash guard
+  // covers positions, normals and colours to catch any read-before-write.
+  static recycle(geometry: Geometry) {
+    for (const g of geometry.geometryGroups) {
+      const full = (g as any).__full;
+      if (!full) continue;
+      (GROUP_POOL[full.key] = GROUP_POOL[full.key] || []).push(full);
+      (g as any).__full = null;
+      POOL_STATS.recycled++;
+    }
+  }
+
   addGeoGroup() {
     var ret = new GeometryGroup(this.geometryGroups.length);
     this.geometryGroups.push(ret);
     this.groups = this.geometryGroups.length;
-  
-    ret.vertexArray = new Float32Array(BUFFERSIZE * 3);
-    ret.colorArray = new Float32Array(BUFFERSIZE * 3);
-  
-    //TODO: instantiating uint arrays according to max number of vertices
-    // is dangerous, since there exists the possibility that there will be
-    // more face or line indices than vertex points - but so far that doesn't
-    // seem to be the case for any of the renders
-    if (this.mesh) {
-      ret.normalArray = new Float32Array(BUFFERSIZE * 3);
-      ret.faceArray = new Uint16Array(BUFFERSIZE * 6);
-      ret.lineArray = new Uint16Array(BUFFERSIZE * 6);
+
+    const key = (this.mesh ? 'm' : '-') + (this.radii ? 'r' : '-') + (this.alpha ? 'a' : '-');
+    const pooled = GROUP_POOL[key] && GROUP_POOL[key].pop();
+    if (pooled) {
+      ret.vertexArray = pooled.vertexArray;
+      ret.colorArray = pooled.colorArray;
+      if (pooled.normalArray) ret.normalArray = pooled.normalArray;
+      if (pooled.faceArray) ret.faceArray = pooled.faceArray;
+      if (pooled.lineArray) ret.lineArray = pooled.lineArray;
+      if (pooled.radiusArray) ret.radiusArray = pooled.radiusArray;
+      if (pooled.alphaArray) ret.alphaArray = pooled.alphaArray;
+      POOL_STATS.reused++;
+    } else {
+      ret.vertexArray = new Float32Array(BUFFERSIZE * 3);
+      ret.colorArray = new Float32Array(BUFFERSIZE * 3);
+
+      //TODO: instantiating uint arrays according to max number of vertices
+      // is dangerous, since there exists the possibility that there will be
+      // more face or line indices than vertex points - but so far that doesn't
+      // seem to be the case for any of the renders
+      if (this.mesh) {
+        ret.normalArray = new Float32Array(BUFFERSIZE * 3);
+        ret.faceArray = new Uint16Array(BUFFERSIZE * 6);
+        ret.lineArray = new Uint16Array(BUFFERSIZE * 6);
+      }
+      if (this.radii) {
+        ret.radiusArray = new Float32Array(BUFFERSIZE);
+      }
+      if (this.alpha) {
+        ret.alphaArray = new Float32Array(BUFFERSIZE);
+      }
+      POOL_STATS.allocated++;
     }
-    if (this.radii) {
-      ret.radiusArray = new Float32Array(BUFFERSIZE);
-    }
-    if (this.alpha) {
-      ret.alphaArray = new Float32Array(BUFFERSIZE);
-    }
+    // Keep the full-capacity arrays: truncateArrayBuffers replaces the group's fields with
+    // subarray views, and it is the full arrays that go back to the pool.
+    (ret as any).__full = { key, vertexArray: ret.vertexArray, colorArray: ret.colorArray, normalArray: ret.normalArray,
+      faceArray: ret.faceArray, lineArray: ret.lineArray, radiusArray: ret.radiusArray, alphaArray: ret.alphaArray };
     ret.useOffset = this.offset;
-  
+
     return ret;
   }
 
