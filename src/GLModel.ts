@@ -158,10 +158,17 @@ export class GLModel {
     //
     // WHICH array a span writes to matters: ARR_VERTEX moves geometry, ARR_NORMAL moves a stick
     // imposter's far endpoint. Both are position data despite the name.
+    //
+    // Atoms are recorded by INDEX into the atom list the geometry was built from, not by object
+    // reference, and resolved against this.atoms when replaying. That is what keeps the replay
+    // correct after setFrame(): it installs a different atom list (new objects) per frame, and
+    // a trajectory guarantees the same atoms in the same order, which is all an index needs.
     private _coordMap: Array<{
         geometry: Geometry; geoGroup: any; arr: number; start: number; count: number;
-        a1: AtomSpec; a2: AtomSpec; t: number;
+        a1: number; a2: number; t: number;
     }> | null = null;
+    private _coordIndex: Map<AtomSpec, number> | null = null;   // atom object -> index, during a build
+    private _coordAtomCount = 0;                                  // length of the list that was built
     // False once anything was drawn that the recipe above cannot express -- currently only
     // multi-bond side offsets, whose parallel cylinders do not lie on the a1->a2 segment.
     // syncAtomPositions() refuses to run when this is false rather than leaving stale geometry.
@@ -175,7 +182,7 @@ export class GLModel {
     // offsets (-r,+r) (-r,-r) (+r,-r) (+r,+r). So animating size means rewriting those corners,
     // which is a normal-array update and rides the same fast path stick endpoints do.
     private _sphereRadiusMap: Array<{
-        geometry: Geometry; geoGroup: any; startv: number; radius: number; atom: AtomSpec;
+        geometry: Geometry; geoGroup: any; startv: number; radius: number; atom: number;
     }> | null = null;
 
     constructor(mid, options?, viewer?) {
@@ -661,9 +668,11 @@ export class GLModel {
 
     private recordSpan(geometry: Geometry, geoGroup: any, arr: number, start: number,
                        count: number, a1: AtomSpec, a2: AtomSpec, t: number | null) {
-        if (!this._coordMap) return;
+        if (!this._coordMap || !this._coordIndex) return;
         if (t === null) { this._coordMapComplete = false; return; }
-        this._coordMap.push({ geometry, geoGroup, arr, start, count, a1, a2, t });
+        const i1 = this._coordIndex.get(a1), i2 = this._coordIndex.get(a2);
+        if (i1 === undefined || i2 === undefined) { this._coordMapComplete = false; return; }
+        this._coordMap.push({ geometry, geoGroup, arr, start, count, a1: i1, a2: i2, t });
     }
 
     // A line segment is two consecutive vertices at t=tA and t=tB along a1->a2. `floatOffset` is
@@ -776,8 +785,9 @@ export class GLModel {
         // `geo` here is already the resolved target -- opaque sphereGeometry or the translucent
         // twin -- so the map stays correct across the per-atom opacity split.
         this.recordSpan(geo, placed.geoGroup, GLModel.ARR_VERTEX, placed.startv, 4, atom, atom, 0);
-        if (this._sphereRadiusMap) {
-            this._sphereRadiusMap.push({ geometry: geo, geoGroup: placed.geoGroup, startv: placed.startv, radius, atom });
+        if (this._sphereRadiusMap && this._coordIndex) {
+            const ai = this._coordIndex.get(atom);
+            if (ai !== undefined) this._sphereRadiusMap.push({ geometry: geo, geoGroup: placed.geoGroup, startv: placed.startv, radius, atom: ai });
         }
     };
 
@@ -1652,6 +1662,9 @@ export class GLModel {
         this._coordMap = [];
         this._coordMapComplete = true;
         this._sphereRadiusMap = [];
+        this._coordIndex = new Map();
+        for (let ai = 0; ai < atoms.length; ai++) this._coordIndex.set(atoms[ai], ai);
+        this._coordAtomCount = atoms.length;
 
         var ret = new Object3D();
         var cartoonAtoms = [];
@@ -2169,12 +2182,21 @@ export class GLModel {
      * Sets to last frame if framenum out of range
      *
      * @param {number} framenum - model's atoms are set to this index in frames list
+     * @param {Object} options - {fast: true} replays the frame's coordinates into the existing
+     *   geometry via syncAtomPositions() instead of rebuilding it; falls back to a rebuild when
+     *   the replay cannot apply. Off by default.
      * @return {Promise}
      */
-    public setFrame(framenum: number) {
+    public setFrame(framenum: number, options: { fast?: boolean } = {}) {
         var numFrames = this.getNumFrames();
         let model = this;
         let viewer = this.viewer;
+        // options.fast: when only coordinates change between frames, replay them into the
+        // existing geometry (syncAtomPositions) instead of discarding it for a full rebuild.
+        // Falls back to the rebuild whenever the replay refuses (nothing built yet, a
+        // representation it cannot express, a different atom count). Off by default: it holds
+        // bond topology fixed across frames, which is right for a trajectory but is a change
+        // from re-deriving bonds every frame, so callers opt in.
         return new Promise<void>(function (resolve, reject) {
             if (numFrames == 0) {
                 //return;
@@ -2197,14 +2219,18 @@ export class GLModel {
                     if (model.box && model.atomdfs) {
                         model.adjustCoordinatesToBox();
                     }
+                    // coordinates were written into the live atoms: replay them in place
+                    if (options.fast && !model.syncAtomPositions()) model.molObj = null;
                     resolve();
                 }).catch(reject);
             }
             else {
                 model.atoms = model.frames[framenum];
+                // a different atom list, same atoms in the same order: indices resolve into it
+                if (options.fast && !model.syncAtomPositions()) model.molObj = null;
                 resolve();
             }
-            model.molObj = null;
+            if (!options.fast) model.molObj = null;
             if (model.modelDatas && framenum < model.modelDatas.length) {
                 model.modelData = model.modelDatas[framenum] || {};
                 if (model.unitCellObjects && viewer) {
@@ -3229,6 +3255,10 @@ export class GLModel {
         var map = this._coordMap;
         if (this.molObj === null || map === null || map.length === 0) return false;
         if (!this._coordMapComplete) return false;   // partial update would be worse than none
+        // The current atom list must be the same shape as the one the recipe was recorded
+        // against; a different length means indices would land on the wrong atoms.
+        var atoms = this.atoms;
+        if (atoms.length !== this._coordAtomCount) return false;
 
         var scale = opts && opts.scale;
         var bondThreshold = (opts && opts.bondThreshold !== undefined) ? opts.bondThreshold : 0.5;
@@ -3242,7 +3272,7 @@ export class GLModel {
             // collapses to the atom centre; for a whole bond it is the two endpoints; for a
             // half-bond the midpoint falls out of t = 0.5 against the CURRENT atom positions,
             // which is why the joint tracks correctly as the structure moves.
-            var a1 = rec.a1, a2 = rec.a2, t = rec.t;
+            var a1 = atoms[rec.a1], a2 = atoms[rec.a2], t = rec.t;
 
             // With a reveal in progress, a bond whose endpoints have not appeared yet would
             // otherwise hang in empty space. Collapsing both its vertices onto a1 gives a
@@ -3294,6 +3324,8 @@ export class GLModel {
     public syncSphereRadii(scale: (atom: AtomSpec) => number): boolean {
         var map = this._sphereRadiusMap;
         if (this.molObj === null || map === null || map.length === 0) return false;
+        var atoms = this.atoms;
+        if (atoms.length !== this._coordAtomCount) return false;
 
         var dirty = [];
         for (var i = 0, n = map.length; i < n; i++) {
@@ -3301,7 +3333,7 @@ export class GLModel {
             var normalArray = rec.geoGroup.normalArray;
             if (!normalArray) continue;
 
-            var r = rec.radius * scale(rec.atom);
+            var r = rec.radius * scale(atoms[rec.atom]);
             var o = rec.startv * 3;
             // corner order must match drawSphereImposter exactly, or the quad turns inside out
             normalArray[o + 0] = -r; normalArray[o + 1] = r;
